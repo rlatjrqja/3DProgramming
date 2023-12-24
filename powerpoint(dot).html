@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>202034007</title>
+    <style>
+        *{margin: 0px;padding: 0px;font-size: 4px;}
+        #screen{
+            display: flex;
+            border: 1px solid black;
+        }
+        #drawArea{
+            border: 1px solid black;
+        }
+        #UIArea{
+            flex: 1;
+            height: 720px;
+            border: 1px solid black;
+        }
+        #Transform{
+            font-size: 20px;
+        }
+        #Position, #Rotation, #Scale{
+            display: flex;
+            align-content: space-between;
+        }
+        #Position div, #Rotation div, #Scale div{
+            
+            font-size: 20px;
+        }
+        .TransformText{
+            width: 120px;
+            height: 25px;
+            font-size: 20px;
+        }
+        .inputBox{
+            width: 150px;
+            height: 30px;
+            font-size: 20px;
+        }
+        #heartBT{
+            width: 70px;
+            height: 70px;
+            font-size: 20px;
+        }
+        #UndoBT{
+            width: 70px;
+            height: 70px;
+            font-size: 20px;
+        }
+    </style>
+</head>
+<body>
+    <script>
+        window.onload = function(){
+            var Position={
+                x: 0,
+                y: 0,
+                z: 0
+            }
+            var Rotation={
+                x: 0,
+                y: 0,
+                z: 0
+            }
+            var Scale={
+                x: 1,
+                y: 1,
+                z: 1
+            }
+            var isDragging
+            var resizeHandleRadius
+            var RotateHandle={x:0,y:0}
+            var LThandle={x:0,y:0}
+            var RThandle={x:0,y:0}
+            var LBhandle={x:0,y:0}
+            var RBhandle={x:0,y:0}
+            var resizeHandleDiameter= 2 * 5;
+            var clickedResizeHandle = "";
+
+            var isDrawing = false;
+            var isDrawMode = false;
+            var isTransed = false;
+            var GoUndo = false;
+            var objectHistory = [];
+
+            class object{
+                //초기화, 정의
+                constructor(x = 0, y = 0, z = 0) {
+                    this.Position = { x, y, z };
+                    this.Rotation = { x, y, z };
+                    this.Scale = { x: 1, y: 1, z: 1 };
+                    this.isDragging = false;
+                    this.resizeHandleRadius = 5;
+                    this.clickedResizeHandle = "";
+                }
+            }
+
+            var canvas = document.getElementById('drawArea');
+            var context = canvas.getContext('2d');
+
+            var heart1 = new object(100,100);
+            var heartArr = new Array;
+
+            var mousedownPosX;
+            var mousedownPosY;
+            var dragAreaX;
+            var dragAreaY;
+
+            var first = [];
+
+            canvas.addEventListener("mousedown", function(event) {
+                mousedownPosX = event.clientX - canvas.getBoundingClientRect().left;
+                mousedownPosY = event.clientY - canvas.getBoundingClientRect().top;
+
+
+                if ((mousedownPosX >= RotateHandle.x - heart1.resizeHandleRadius*1.5 && mousedownPosX <= RotateHandle.x + heart1.resizeHandleRadius*1.5) &&
+                    (mousedownPosY >= RotateHandle.y - heart1.resizeHandleRadius*1.5 && mousedownPosY <= RotateHandle.y + heart1.resizeHandleRadius*1.5)) {
+                    heart1.clickedResizeHandle = "R";
+                    isTransed = true;
+                }
+                else if ((mousedownPosX >= RBhandle.x - heart1.resizeHandleRadius && mousedownPosX <= RBhandle.x + heart1.resizeHandleRadius) &&
+                    (mousedownPosY >= RBhandle.y - heart1.resizeHandleRadius && mousedownPosY <= RBhandle.y + heart1.resizeHandleRadius)) {
+                    heart1.clickedResizeHandle = "RB";
+                    isTransed = true;
+                }
+                else if (mousedownPosX >= LThandle.x && mousedownPosX <= RBhandle.x &&
+                        mousedownPosY >= LThandle.y && mousedownPosY <= RBhandle.y) {
+                        heart1.isDragging = true;
+                        heart1.dragOffsetX = mousedownPosX-heart1.Position.x
+                        heart1.dragOffsetY = mousedownPosY-heart1.Position.y;
+                        isTransed = true;
+                }
+                else isDrawing = true;
+                
+                if(isTransed)
+                {
+                    //드래그 시작 할 때 위치, 각도, 크기 저장
+                    //first = [heart1.Position,heart1.Rotation,heart1.Scale];
+
+                    first = [[heart1.Position.x,heart1.Position.y,heart1.Position.z],
+                    [heart1.Rotation.x,heart1.Rotation.y,heart1.Rotation.z],
+                    [heart1.Scale.x,heart1.Scale.y,heart1.Scale.z]];
+
+                    //아니면 버튼에 따라 역행렬 각각 저장?? << 이거 좀 유력한데
+                }
+            });
+
+
+            canvas.addEventListener("mousemove", function(event) {
+                var mouseX = event.clientX - canvas.getBoundingClientRect().left;
+                var mouseY = event.clientY - canvas.getBoundingClientRect().top;
+
+                if(isDrawMode && isDrawing)
+                {
+                    dragAreaX = mouseX-mousedownPosX;
+                    dragAreaY = mouseY-mousedownPosY;
+
+                    context.beginPath();
+
+                    context.clearRect(0, 0, canvas.width, canvas.height);
+                    context.fillStyle = "red";
+                    context.fillRect(mousedownPosX, mousedownPosY, dragAreaX, dragAreaY);
+                    context.fillStyle = "white";
+                    context.fillRect(mousedownPosX+5, mousedownPosY+5, dragAreaX-10, dragAreaY-10);
+                }
+                else if(heart1.clickedResizeHandle=="R")
+                {
+                    heart1.Rotation.z = -Math.atan2(mouseY - heart1.Position.y, mouseX - heart1.Position.x)- Math.PI/2;
+
+                    draw(heart1);
+                }
+                else if(heart1.clickedResizeHandle=="RB")
+                {
+                    var deltaX = mouseX - RBhandle.x;
+                    var deltaY = mouseY - RBhandle.y;
+                    
+                    // You can use a scaling factor to control the sensitivity of the resizing.
+                    var scaleFactor = 0.02; // Adjust this value as needed.
+
+                    // Update the scale factors for heart1.
+                    heart1.Scale.x = Math.max(0.1, heart1.Scale.x + deltaX * scaleFactor);
+                    heart1.Scale.y = Math.max(0.1, heart1.Scale.y + deltaY * scaleFactor);
+
+                    draw(heart1); 
+                }
+                else if(heart1.isDragging)
+                {
+
+                    heart1.Position.x = mouseX - heart1.dragOffsetX;
+                    heart1.Position.y = mouseY - heart1.dragOffsetY;
+
+                    draw(heart1);
+                }
+                
+            });
+
+            canvas.addEventListener("mouseup", function() {
+                var mouseX = event.clientX - canvas.getBoundingClientRect().left;
+                var mouseY = event.clientY - canvas.getBoundingClientRect().top;
+
+                if(isDrawMode)
+                {   
+                    context.clearRect(0, 0, canvas.width, canvas.height);
+
+                    heart1.Position.x = mousedownPosX+dragAreaX/2;
+                    heart1.Position.y = mousedownPosY+dragAreaY/2;
+                    heart1.Rotation.z = 0;
+                    heart1.Scale.x = dragAreaX/100;
+                    heart1.Scale.y = dragAreaY/100;
+                    draw(heart1);
+                }
+                else if(isTransed)
+                {
+                    // if(heart1.isDragging)
+                    // {
+                    //     objectHistory.push({
+                    //     Position: { x: heart1.Position.x-first[0][0], y: heart1.Position.y-first[0][1], z: heart1.Position.z-first[0][2] },
+                    //     Rotation: { x: heart1.Rotation.x, y: heart1.Rotation.y, z: heart1.Rotation.z },
+                    //     Scale:  { x: heart1.Scale.x, y: heart1.Scale.y, z: heart1.Scale.z }
+                    //     });
+                    // }
+                    // else if(heart1.clickedResizeHandle=="R")
+                    // {
+                    //     objectHistory.push({
+                    //         Position: { x: heart1.Position.x, y: heart1.Position.y, z: heart1.Position.z },
+                    //         Rotation: { x: heart1.Rotation.x-first[1][0], y: heart1.Rotation.y-first[1][1], z: heart1.Rotation.z-first[1][2] },
+                    //         Scale:  { x: heart1.Scale.x, y: heart1.Scale.y, z: heart1.Scale.z }
+                    //     });
+                    // }
+                    // else if(heart1.clickedResizeHandle=="RB")
+                    // {
+                    //     objectHistory.push({
+                    //         Position: { x: heart1.Position.x, y: heart1.Position.y, z: heart1.Position.z },
+                    //         Rotation: { x: heart1.Rotation.x, y: heart1.Rotation.y, z: heart1.Rotation.z },
+                    //         Scale:  { x: heart1.Scale.x-first[2][0], y: heart1.Scale.y-first[2][1], z: heart1.Scale.z-first[2][2] }
+                    //     });
+                    // }
+
+                    if(heart1.isDragging)
+                    {
+                        objectHistory.push({
+                        Position: { x: heart1.Position.x-first[0][0], y: heart1.Position.y-first[0][1], z: heart1.Position.z-first[0][2] },
+                        Rotation: { x: 0, y: 0, z: 0 },
+                        Scale:  { x: 1, y: 1, z: 1 }
+                        });
+                    }
+                    else if(heart1.clickedResizeHandle=="R")
+                    {
+                        objectHistory.push({
+                            Position: { x: 0, y: 0, z: 0 },
+                            Rotation: { x: heart1.Rotation.x-first[1][0], y: heart1.Rotation.y-first[1][1], z: heart1.Rotation.z-first[1][2] },
+                            Scale:  { x: 1, y: 1, z: 1 }
+                        });
+                    }
+                    else if(heart1.clickedResizeHandle=="RB")
+                    {
+                        objectHistory.push({
+                            Position: { x: 0, y: 0, z: 0 },
+                            Rotation: { x: 0, y: 0, z: 0 },
+                            Scale:  { x: heart1.Scale.x/first[2][0], y: heart1.Scale.y/first[2][1], z: heart1.Scale.z/first[2][2] }
+                        });
+                    }
+
+
+                        // objectHistory.push({
+                        //     Position: { x: heart1.Position.x-first[0][0], y: heart1.Position.y-first[0][1], z: heart1.Position.z-first[0][2] },
+                        //     Rotation: { x: heart1.Rotation.x-first[1][0], y: heart1.Rotation.y-first[1][1], z: heart1.Rotation.z-first[1][2] },
+                        //     Scale:  { x: heart1.Scale.x-first[2][0], y: heart1.Scale.y-first[2][1], z: heart1.Scale.z-first[2][2] }
+                        // });
+                }
+
+                heart1.clickedResizeHandle = "";
+                heart1.isDragging = false;
+                isDrawing = false;
+                isDrawMode = false;
+            });
+
+
+            //벡터행렬곱
+            function VecMatMultiply(matrixA, point){
+                var a = matrixA[0][0] * point[0] + matrixA[0][1] * point[1]  + matrixA[0][2] * point[2];
+                var b = matrixA[1][0] * point[0] + matrixA[1][1] * point[1]  + matrixA[1][2] * point[2];
+                var c = matrixA[2][0] * point[0] + matrixA[2][1] * point[1]  + matrixA[2][2] * point[2];
+                return [a,b,c];
+            }
+
+            //행렬곱
+            function hwMatrixMultiply(matrixA, matrixB){
+                var rowsA = matrixA.length;
+                var colsA = matrixA[0].length;
+                var rowsB = matrixB.length;
+                var colsB = matrixB[0].length;
+
+                var result = new Array(rowsA);
+                for (var i = 0; i < rowsA; i++) {
+                    result[i] = new Array(colsB);
+                    for (var j = 0; j < colsB; j++) {
+                        result[i][j] = 0;
+                        for (var k = 0; k < colsA; k++) {
+                            result[i][j] += matrixA[i][k] * matrixB[k][j];
+                        }
+                    }
+                }
+
+                return result;
+            }
+
+            //이동행렬
+            function hwTranslateMatrix(x,y){
+                return [[1, 0, x], [0, 1, y], [0, 0, 1]];
+            }
+
+            //확대축소행렬
+            function hwScaleMatrix(x,y){
+                return [[x, 0, 0], [0, -y, 0], [0, 0, 1]];
+            }
+
+            //회전행렬
+            function hwRotationMatrix(angle){
+                var cos = Math.cos(angle);
+                var sin = Math.sin(angle);
+                return [[cos, sin, 0], [-sin, cos, 0], [0, 0, 1]];
+            }
+
+            /////////////////////////////////////////////////////
+
+            //이동 역행렬
+            function ITranslateMatrix(x,y){
+                return [[1, 0, -x], [0, 1, -y], [0, 0, 1]];
+            }
+
+            //확대축소 역행렬
+            function IScaleMatrix(x,y){
+                return [[1/x, 0, 0], [0, 1/y, 0], [0, 0, 1]];
+            }
+
+            //회전 역행렬
+            function IRotationMatrix(angle){
+                var cos = Math.cos(angle);
+                var sin = Math.sin(angle);
+                return [[cos, -sin, 0], [sin, cos, 0], [0, 0, 1]];
+            }
+            
+            var HM={x:0,y:0}
+            function draw(object)
+            {
+                context.clearRect(0, 0, canvas.width, canvas.height);
+
+                context.beginPath();
+                context.strokeStyle = 'blue';
+
+
+                var scaleMatrix = hwScaleMatrix(object.Scale.x, object.Scale.y); // 크기 행렬 생성
+                var rotationMatrix = hwRotationMatrix(object.Rotation.z); // 각도 행렬 생성
+                var translateMatrix = hwTranslateMatrix(object.Position.x, object.Position.y); // 위치 행렬 생성
+
+                var finalMatrix1 = hwMatrixMultiply(translateMatrix,rotationMatrix);//확대-회전-이동 순으로 적용
+                var finalMatrix2 = hwMatrixMultiply(finalMatrix1,scaleMatrix);
+
+                
+
+                for (var angle = 0; angle <= 2*Math.PI; angle += 0.01) {
+                    HM.x = 3*(16 * Math.pow(Math.sin(angle), 3));
+                    HM.y = 3*(13 * Math.cos(angle) - 5 * Math.cos(2 * angle) - 2 * Math.cos(3 * angle) - Math.cos(4 * angle));
+
+                    
+                    var finalMatrix3 = VecMatMultiply(finalMatrix2,[HM.x,HM.y,1]);
+
+                        context.lineTo(finalMatrix3[0], finalMatrix3[1]);
+                }
+                context.stroke();
+
+                //크기 키우는 핸들
+                handle(object);
+
+                update();
+            }
+
+            function undo(object) {
+                if (objectHistory.length > 0 ) { // 최소 한 개의 상태가 필요
+
+                    context.clearRect(0, 0, canvas.width, canvas.height);
+
+                    context.beginPath();
+                    context.strokeStyle = 'blue';
+
+                    var previousState = objectHistory.pop();
+                    
+                    var scaleMatrix = IScaleMatrix(previousState.Scale.x, previousState.Scale.y); // 크기 행렬 생성
+                    var rotationMatrix = IRotationMatrix(previousState.Rotation.z); // 각도 행렬 생성
+                    var translateMatrix = ITranslateMatrix(previousState.Position.x, previousState.Position.y); // 위치 행렬 생성
+
+                    var scaleMatrix123 = hwScaleMatrix(object.Scale.x, object.Scale.y); // 크기 행렬 생성
+                    var rotationMatrix123 = hwRotationMatrix(object.Rotation.z); // 각도 행렬 생성
+                    var translateMatrix123 = hwTranslateMatrix(object.Position.x, object.Position.y); // 위치 행렬 생성
+
+
+                    
+                
+
+                    for (var angle = 0; angle <= 2*Math.PI; angle += 0.01) {
+                        var x = 3*(16 * Math.pow(Math.sin(angle), 3));
+                        var y = 3*(13 * Math.cos(angle) - 5 * Math.cos(2 * angle) - 2 * Math.cos(3 * angle) - Math.cos(4 * angle));
+
+
+                        var finalMatrix4 = hwMatrixMultiply(translateMatrix123,rotationMatrix123);//확대-회전-이동 순으로 적용
+                        var finalMatrix5 = hwMatrixMultiply(finalMatrix4,scaleMatrix123);
+                        var finalMatrix6 = VecMatMultiply(finalMatrix5,[x,y,1]);
+
+                        var finalMatrix1 = hwMatrixMultiply(translateMatrix,rotationMatrix);//확대-회전-이동 순으로 적용
+                        var finalMatrix2 = hwMatrixMultiply(finalMatrix1,scaleMatrix);
+                        var finalMatrix3 = VecMatMultiply(finalMatrix2 ,[finalMatrix6[0],finalMatrix6[1],1]);
+
+                        context.lineTo(finalMatrix3[0], finalMatrix3[1]);
+                    }
+
+                    context.stroke();
+
+                    //크기 키우는 핸들
+                    handle(object);
+
+                    update();
+                }
+            }
+
+            ////////////////////Position/////////////////////////
+            var xPos = document.querySelector('#positionX');
+            xPos.addEventListener('input',function(){
+                heart1.Position.x = parseFloat(xPos.value);
+                draw(heart1);
+            })
+            var yPos = document.querySelector('#positionY');
+            yPos.addEventListener('input',function(){
+                heart1.Position.y = parseFloat(yPos.value);
+                draw(heart1);
+            })
+            var zPos = document.querySelector('#positionZ');
+
+            ///////////////////Rotation////////////////////////////
+            var xRot = document.querySelector('#RotationX');
+            xRot.addEventListener('input',function(){
+                heart1.Rotation.x = parseFloat((xRot.value)*(Math.PI/180));
+                draw(heart1);
+            })
+            var yRot = document.querySelector('#RotationY');
+            var zRot = document.querySelector('#RotationZ');
+            zRot.addEventListener('input',function(){
+                heart1.Rotation.z = zRot.value*(Math.PI/180);
+                draw(heart1);
+            })
+
+            ////////////////////Scale/////////////////////////////
+            var xSize = document.querySelector('#ScaleX');
+            xSize.addEventListener('input',function(){
+                heart1.Scale.x = parseFloat(xSize.value);
+                draw(heart1);
+            })
+            var ySize = document.querySelector('#ScaleY');
+            ySize.addEventListener('input',function(){
+                heart1.Scale.y = parseFloat(ySize.value);
+                draw(heart1);
+            })
+            var zSize = document.querySelector('#ScaleZ');
+
+            ///////////////////////////////////////////////////////
+
+            var drawBT = document.querySelector('#heartBT');
+            drawBT.addEventListener('click',function(){
+                isDrawMode = true;
+            })
+
+            var UndoBT = document.querySelector('#UndoBT');
+            UndoBT.addEventListener('click',function(){
+                undo(heart1);
+            })
+
+            function handle(object)
+            {   
+                var rotatedHandleX = Math.cos(object.Rotation.z) - Math.sin(object.Rotation.z) * 75;
+                var rotatedHandleY = Math.sin(object.Rotation.z) + Math.cos(object.Rotation.z) * 75;
+                
+                context.beginPath();
+                context.fillStyle = 'red';
+                RotateHandle.x = heart1.Position.x+rotatedHandleX*heart1.Scale.x;
+                RotateHandle.y = heart1.Position.y-rotatedHandleY*heart1.Scale.y;
+                context.arc(RotateHandle.x, RotateHandle.y, object.resizeHandleRadius*1.5, 0, 2 * Math.PI);
+                context.fill();
+
+                
+
+                var positionHandleX = Math.cos(object.Rotation.z) * 50 - Math.sin(object.Rotation.z) * 50;
+                var positionHandleY = Math.sin(object.Rotation.z) * 50 + Math.cos(object.Rotation.z) * 50;
+
+                //왼쪽 위
+                context.fillStyle = 'black';
+                context.beginPath();
+                LThandle.x = object.Position.x-positionHandleY*object.Scale.x;
+                LThandle.y = object.Position.y-positionHandleX*object.Scale.y;
+                context.arc(LThandle.x, LThandle.y, object.resizeHandleRadius, 0, 2 * Math.PI);
+                context.fill();
+
+                //오른쪽 위
+                context.beginPath();
+                RThandle.x = object.Position.x-positionHandleX*object.Scale.x;
+                RThandle.y = object.Position.y+positionHandleY*object.Scale.y;
+                context.arc(RThandle.x, RThandle.y, object.resizeHandleRadius, 0, 2 * Math.PI);
+                context.fill();
+
+                //왼쪽 아래
+                context.beginPath();
+                LBhandle.x = object.Position.x+positionHandleX*object.Scale.x;
+                LBhandle.y = object.Position.y-positionHandleY*object.Scale.y;
+                context.arc(LBhandle.x, LBhandle.y, object.resizeHandleRadius, 0, 2 * Math.PI);
+                context.fill();
+
+                //오른쪽 아래
+                context.beginPath();
+                RBhandle.x = object.Position.x+positionHandleY*object.Scale.x;
+                RBhandle.y = object.Position.y+positionHandleX*object.Scale.y;
+                context.arc(RBhandle.x, RBhandle.y, object.resizeHandleRadius, 0, 2 * Math.PI);
+                context.fill();
+                
+            }
+
+            //Transform 업데이트
+            function update()
+            {
+                xPos.value = heart1.Position.x;
+                yPos.value = heart1.Position.y;
+
+                //zRot.value=(heart1.Rotation.z*(180/Math.PI)).toFixed(2);
+                zRot.value= heart1.Rotation.z*(180/Math.PI);
+                //yRot.value=0;
+
+                xSize.value = heart1.Scale.x;
+                ySize.value = heart1.Scale.y;
+            }
+
+            //draw(heart1);
+        }
+    </script>
+    <div id="screen">
+        <canvas id="drawArea" width ="1280" height="720"></canvas>
+        <section id="UIArea">
+            <div id="Transform">Transform
+                <br>
+                <div id="Position">
+                    <div class="TransformText">Position</div>
+                    <div>X</div><div><input type="text" class="inputBox" id="positionX" placeholder="0"></div>
+                    <div>Y</div><div><input type="text" class="inputBox" id="positionY" placeholder="0"></div>
+                    <div>Z</div><div><input type="text" class="inputBox" id="positionZ" placeholder="미구현"></div>
+                </div>
+                <br>
+                <div id="Rotation">
+                    <div class="TransformText">Rotation</div>
+                    <div>X</div><div><input type="text" class="inputBox" id="RotationX" placeholder="미구현"></div>
+                    <div>Y</div><div><input type="text" class="inputBox" id="RotationY" placeholder="미구현"></div>
+                    <div>Z</div><div><input type="text" class="inputBox" id="RotationZ" placeholder="0"></div>
+                </div>
+                <br>
+                <div id="Scale">
+                    <div class="TransformText">Scale</div>
+                    <div>X</div><div><input type="text" class="inputBox" id="ScaleX" placeholder="0"></div>
+                    <div>Y</div><div><input type="text" class="inputBox" id="ScaleY" placeholder="0"></div>
+                    <div>Z</div><div><input type="text" class="inputBox" id="ScaleZ" placeholder="미구현"></div>
+                </div>
+            </div>
+            <button id="heartBT">Draw New Heart</button>
+            <br>
+            <button id="UndoBT">Undo</button>
+        </section>
+    </div>
+</body>
+</html>
